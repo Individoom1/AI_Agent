@@ -123,14 +123,6 @@ def main():
             print(f"ERROR: {e}")
     
     elapsed = time.time() - start_time
-    
-    print("\n" + "=" * 60)
-    print("TEST SUMMARY")
-    print("=" * 60)
-    for test_name, result in results.items():
-        print(f"{test_name:30} {result}")
-    print(f"Time: {elapsed:.1f}s")
-    print("=" * 60)
 
 if __name__ == "__main__":
     main()
