@@ -47,7 +47,7 @@ def get_lots_with_enstru(enstru_codes: List[int] = None, region: str = None, yea
     params = []
     if enstru_codes:
         query += " AND l.enstruList && %s"
-        params.append(enstru_codes)
+        params.append([int(code) for code in enstru_codes])
         
     if region:
         query += " AND l.plnPointKatoList @> %s"
@@ -83,6 +83,7 @@ def get_lots_with_enstru(enstru_codes: List[int] = None, region: str = None, yea
 
 def calculate_fair_price(lots: List[Dict], target_enstru: int, region: str = None, target_year: int = None) -> Dict:
     """Рассчитать Fair Price для ЕНСТРУ с учетом региона и времени"""
+    target_enstru = int(target_enstru)
     relevant_lots = [lot for lot in lots if target_enstru in (lot.get('enstru_codes') or [])]
     
     if not relevant_lots:
@@ -98,7 +99,7 @@ def calculate_fair_price(lots: List[Dict], target_enstru: int, region: str = Non
         if not relevant_lots:
             return {'error': f'Нет данных для ЕНСТРУ {target_enstru} за {target_year} год'}
     
-    amounts = [float(lot['amount']) for lot in relevant_lots if lot['amount']]
+    amounts = [float(lot['amount']) for lot in relevant_lots if lot['amount'] and lot['amount'] >= 1000]
     
     if len(amounts) < 3:
         return {'error': f'Недостаточно данных для статистики ({len(amounts)} лотов)'}
@@ -179,7 +180,7 @@ def detect_anomalies(lots: List[Dict], threshold_percent: float = 30.0) -> List[
     if not lots:
         return []
     
-    amounts = [float(lot['amount']) for lot in lots if lot['amount']]
+    amounts = [float(lot['amount']) for lot in lots if lot['amount'] and lot['amount'] >= 1000]
     if len(amounts) < 3:
         return []
     
@@ -205,7 +206,8 @@ def detect_anomalies(lots: List[Dict], threshold_percent: float = 30.0) -> List[
         
         iqr_anomaly = price < lower_bound or price > upper_bound
         
-        is_anomaly = (z_score > 3) or iqr_anomaly or (percent_deviation > threshold_percent)
+        # Аномалия = выходит за пределы Tukey fences ИЛИ очень высокий Z-score (>3)
+        is_anomaly = iqr_anomaly or (z_score > 3)
         
         if is_anomaly:
             anomalies.append({
@@ -341,7 +343,7 @@ IQR: {fp['iqr']:,.0f} тенге
 5. Ограничения и уверенность: {confidence}{top_k_info}"""
 
 if __name__ == "__main__":
-    lots = get_lots_with_enstru([12345], year=2023)  # Пример ЕНСТРУ кода
+    lots = get_lots_with_enstru([12345], year=2023)
     if lots:
         fair_price = calculate_fair_price(lots, 12345)
         print("Fair Price Analysis:")
@@ -349,5 +351,5 @@ if __name__ == "__main__":
         
         anomalies = detect_anomalies(lots, 30.0)
         print(f"\nНайдено аномалий: {len(anomalies)}")
-        for anomaly in anomalies[:5]:  # Top 5
+        for anomaly in anomalies[:5]:
             print(f"Лот {anomaly['lot_id']}: {anomaly['amount']:,.0f} тенге (+{anomaly['deviation_percent']:.1f}%)")
